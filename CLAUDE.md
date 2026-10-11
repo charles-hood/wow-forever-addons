@@ -37,6 +37,18 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
   session 4 logged ADDON_ACTION_FORBIDDEN once "during RegisterEvent
   COMBAT_LOG_EVENT_UNFILTERED" and once "during UnregisterEvent
   COMBAT_LOG_EVENT_UNFILTERED", nothing else. Never register that event.
+- **Pet happiness is readable (session 6, 2026-10-10).** `C_PetInfo.GetPetHappiness()`
+  returned plain values (3, 125, 20: happy, 125% damage, loyalty rate), `GetPetLoyalty`
+  "Best Friend", `GetPetTrainingPoints` 75/5, `GetPetFoodTypes` the six omnivore
+  types for a boar, `CanPetEatItem` true for 6 of 37 bag items with their links,
+  and the "Feed Pet Effect" aura on the pet readable by name while it ate. The
+  happiness power type (`UnitPower("pet", 4)`) is secret, max 1000; use the
+  C_PetInfo call. `UNIT_HAPPINESS` fires about twice a second in combat for
+  "pet", "player" and "targettarget", so throttle it. `PetFrameHappiness` exists
+  but is not the Classic texture (no GetTexCoord).
+- **The stuck loading screen (21:48) was not the addons.** The same launch finished
+  loading two minutes later with all four addons on and zero errors. Slow world
+  server. The stack sample at the time showed a render loop, not a Lua loop.
 - **BuffReminder verified in game (2026-10-10, build 70338).** Dropping the Aspect
   made the icon appear; recasting it made it go away. The Hunter's Mark check
   (target debuff read by name, out of combat) also worked in game via `/br check`.

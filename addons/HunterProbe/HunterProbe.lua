@@ -475,12 +475,17 @@ local function samplePet(reason)
 	local okA, aura = call("C_UnitAuras.GetAuraDataBySpellName", "pet", FEED_PET_EFFECT, "HELPFUL")
 	p.feeding = (okA == nil) and "missing" or (okA and (aura and "yes" or "no") or ("ERR " .. str(aura)))
 	-- the Classic pet frame had a happiness icon; see whether anything like it exists here
+	-- Session 6 (build 70338): PetFrameHappiness exists but has no GetTexCoord, so it is
+	-- not the Classic texture. Record what it is instead of calling into it blindly.
 	local hf = _G.PetFrameHappiness
 	if hf then
-		local okC, l, r, t, b = pcall(function() return hf:GetTexCoord() end)
-		p.frameHappiness = okC and ("texcoord " .. str(l) .. "," .. str(r) .. "," .. str(t) .. "," .. str(b)) or ("ERR " .. str(l))
-		local okS, shown = pcall(function() return hf:IsShown() end)
-		p.frameHappinessShown = okS and describe(shown) or "?"
+		local okO, objType = pcall(function() return hf.GetObjectType and hf:GetObjectType() end)
+		local okS, shown = pcall(function() return hf.IsShown and hf:IsShown() end)
+		p.frameHappiness = ("%s shown=%s"):format(okO and str(objType) or "?", okS and describe(shown) or "?")
+		if type(hf.GetTexCoord) == "function" then
+			local okC, l, r, t, b = pcall(hf.GetTexCoord, hf)
+			p.frameHappiness = p.frameHappiness .. (okC and (" texcoord " .. str(l) .. "," .. str(r) .. "," .. str(t) .. "," .. str(b)) or (" ERR " .. str(l)))
+		end
 	else
 		p.frameHappiness = "no PetFrameHappiness global"
 	end
@@ -521,7 +526,7 @@ local function petFood()
 	return edible, checked
 end
 
-local lastHappiness
+local lastHappiness, lastFeeding
 
 local function reportPet(reason)
 	reason = reason or "manual"
@@ -548,12 +553,15 @@ local happinessEvents = 0
 
 petFrame:SetScript("OnEvent", function(_, event, a1)
 	if event == "UNIT_HAPPINESS" then
+		-- fires about twice a second in combat, for "player" and "targettarget" as well as
+		-- "pet" (session 6), so log the first few and then only real changes
 		happinessEvents = happinessEvents + 1
 		local p, summary = samplePet("UNIT_HAPPINESS")
-		if happinessEvents <= 50 or p.happiness ~= lastHappiness then
+		if happinessEvents <= 3 or p.happiness ~= lastHappiness or p.feeding ~= lastFeeding then
 			info("UNIT_HAPPINESS #%s unit=%s -> %s", happinessEvents, describe(a1), summary)
 		end
 		lastHappiness = p.happiness
+		lastFeeding = p.feeding
 	elseif event == "PET_UI_UPDATE" or event == "UNIT_PET" then
 		if event == "UNIT_PET" and a1 ~= "player" then
 			return

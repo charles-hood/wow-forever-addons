@@ -21,7 +21,7 @@ under "Measured on this Mac".
 addons/ForeverProbe/     platform probe: SavedVariables lifecycle, build facts, API and
                          event presence, secret-value snapshots, Lua error capture,
                          event watch, ring-buffer log shared by other probes   /fp
-addons/HunterProbe/      range and dead zone, ammo slot and bags, auras, swing events   /hp
+addons/HunterProbe/      range and dead zone, ammo, auras, swing events, pet happiness  /hp
 addons/HunterHUD/        hunter HUD: range light, dead zone, melee dot, ammo counter      /hh
 addons/BuffReminder/     out-of-combat icons for missing self-buffs, pet, Aspect           /br
 scripts/deploy.sh        symlink (or --copy) the addons into the client
@@ -82,8 +82,10 @@ because aura reads throw there on this client; it re-checks half a second after
 combat ends. Checks match buffs by name, so ranks do not matter, and a check is
 only active once the spell is in your spellbook.
 
-Default checks: Hunter (any Aspect, pet present and alive; Hunter's Mark on a
-live hostile target is off by default), Druid (Mark of the Wild or Gift of the
+Default checks: Hunter (any Aspect; pet present and alive; pet fed, which shows
+"Feed pet (content)" or "Feed pet (unhappy)" from the client's own happiness call
+and clears while the pet is eating; Hunter's Mark on a live hostile target is off
+by default), Druid (Mark of the Wild or Gift of the
 Wild; Thorns off by default), Mage (Arcane Intellect or Brilliance; any Armor),
 Priest (Fortitude; Inner Fire), Warlock (Demon Skin or Armor; pet), Paladin
 (any Blessing), Shaman (Lightning Shield, off by default), Warrior (Battle

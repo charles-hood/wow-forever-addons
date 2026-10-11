@@ -50,7 +50,7 @@ end
 ------------------------------------------------------------------
 -- hunter with everything up
 ------------------------------------------------------------------
-local hunterKnown = { [13165] = true, [883] = true, [1130] = true }
+local hunterKnown = { [13165] = true, [883] = true, [1130] = true, [6991] = true }
 Stub.units.pet = true
 local ns, f = startSession(nil, "HUNTER", { { name = "Aspect of the Hawk" } }, hunterKnown)
 Stub.units.pet = true
@@ -142,6 +142,41 @@ Stub.units.target = nil
 Stub.targetAuras = {}
 ns.handleSlash("off mark")
 check(BuffReminderDB.checks.mark == false, "check toggle saved")
+
+-- pet happiness: content and unhappy nag, happy or eating does not
+Stub.units.target = nil
+Stub.auras = { { name = "Aspect of the Hawk" } }
+Stub.pet.happiness = 2
+Stub.fire("UNIT_HAPPINESS", "pet")
+settle()
+check(f:IsShown() and labels(f) == "Feed pet (content)", "content pet asks for food, got " .. labels(f))
+Stub.pet.happiness = 1
+Stub.fire("UNIT_HAPPINESS", "pet")
+settle()
+check(labels(f) == "Feed pet (unhappy)", "unhappy pet labelled, got " .. labels(f))
+Stub.auras = { { name = "Aspect of the Hawk" }, { name = "Feed Pet Effect" } }
+_G.C_UnitAuras.GetAuraDataBySpellName = function(unit, name)
+	if unit == "pet" and name == "Feed Pet Effect" then return { name = name } end
+	return nil
+end
+Stub.fire("UNIT_HAPPINESS", "pet")
+settle()
+check(not f:IsShown(), "eating pet is not nagged")
+_G.C_UnitAuras.GetAuraDataBySpellName = function() return nil end
+Stub.pet.happiness = 3
+Stub.fire("UNIT_HAPPINESS", "pet")
+settle()
+check(not f:IsShown(), "happy pet clears the reminder")
+Stub.combat = true
+local before2 = #Stub.timers
+Stub.fire("UNIT_HAPPINESS", "pet")
+check(#Stub.timers == before2, "happiness events in combat schedule nothing")
+Stub.combat = false
+Stub.pet.happiness = Stub.SECRET
+Stub.fire("UNIT_HAPPINESS", "pet")
+local oks, es = pcall(settle)
+check(oks and not f:IsShown(), "secret happiness is treated as fine, no raise: " .. tostring(es))
+Stub.pet.happiness = 3
 
 -- unknown spell never nags
 ns, f = startSession(nil, "HUNTER", {}, { [883] = true })

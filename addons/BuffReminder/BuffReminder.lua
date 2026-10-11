@@ -115,6 +115,35 @@ local function petOk()
 	return true
 end
 
+-- Pet happiness via C_PetInfo.GetPetHappiness(): 1 unhappy, 2 content, 3 happy.
+-- Measured plain on build 70338 (the happiness power type is secret, this call is
+-- not). Satisfied when happy, or when the pet is already eating.
+local HAPPINESS_LABEL = { [1] = "Feed pet (unhappy)", [2] = "Feed pet (content)" }
+local function petFed()
+	if call(UnitExists, "pet") ~= true or call(UnitIsDead, "pet") == true then
+		return true -- the pet check covers that case
+	end
+	local petInfo = _G.C_PetInfo
+	if not petInfo or type(petInfo.GetPetHappiness) ~= "function" then
+		return true
+	end
+	local ok, happiness = pcall(petInfo.GetPetHappiness)
+	if not ok or issecret(happiness) or type(happiness) ~= "number" then
+		return true
+	end
+	if happiness >= 3 then
+		return true
+	end
+	local auras = _G.C_UnitAuras
+	if auras and type(auras.GetAuraDataBySpellName) == "function" then
+		local okA, eating = pcall(auras.GetAuraDataBySpellName, "pet", "Feed Pet Effect", "HELPFUL")
+		if okA and eating ~= nil then
+			return true
+		end
+	end
+	return false, HAPPINESS_LABEL[happiness] or "Feed pet"
+end
+
 -- Hunter's Mark on a live hostile target, out of combat (a pre-pull reminder)
 local function markOk()
 	if call(UnitExists, "target") ~= true
@@ -143,6 +172,7 @@ end
 ns.CHECKS = {
 	{ key = "aspect", class = "HUNTER", label = "Aspect", known = { 13163, 13165 }, icon = 13165, test = hasPrefix("Aspect of the") },
 	{ key = "pet", class = "HUNTER", label = "Pet", known = { 883 }, icon = 883, test = petOk },
+	{ key = "feed", class = "HUNTER", label = "Feed pet", known = { 6991 }, icon = 6991, test = petFed },
 	{ key = "mark", class = "HUNTER", label = "Hunter's Mark", known = { 1130 }, icon = 1130, test = markOk, default = false },
 	{ key = "motw", class = "DRUID", label = "Mark of the Wild", known = { 1126 }, icon = 1126, test = hasAny({ "Mark of the Wild", "Gift of the Wild" }) },
 	{ key = "thorns", class = "DRUID", label = "Thorns", known = { 467 }, icon = 467, test = hasAny({ "Thorns" }), default = false },
@@ -383,8 +413,8 @@ end
 
 local events = CreateFrame("Frame")
 for _, ev in ipairs({ "ADDON_LOADED", "PLAYER_LOGIN", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED",
-	"PLAYER_REGEN_DISABLED", "UNIT_AURA", "UNIT_PET", "PLAYER_TARGET_CHANGED", "SPELLS_CHANGED",
-	"PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
+	"PLAYER_REGEN_DISABLED", "UNIT_AURA", "UNIT_PET", "UNIT_HAPPINESS", "PLAYER_TARGET_CHANGED",
+	"SPELLS_CHANGED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST" }) do
 	pcall(events.RegisterEvent, events, ev)
 end
 
@@ -413,6 +443,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
 	elseif event == "UNIT_PET" then
 		if arg1 == "player" then
 			scheduleEvaluate("pet")
+		end
+	elseif event == "UNIT_HAPPINESS" then
+		if arg1 == "pet" and call(InCombatLockdown) ~= true then
+			scheduleEvaluate("happiness")
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		scheduleEvaluate("target")
