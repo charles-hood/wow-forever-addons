@@ -1,7 +1,16 @@
-# wow-forever-addons
+# WoW: Forever addons, client probes, and a Mac dev loop
 
-Addons for the World of Warcraft: Forever beta, developed on this Mac against the
-client at `/Applications/World of Warcraft/_classic_beta_`.
+Lua addons for the World of Warcraft: Forever beta (interface 16001, the Retail
+12.x engine with secret values), plus probe addons that measure what the live
+client actually allows: SavedVariables, secret values in and out of combat,
+range checks, pet happiness, forbidden actions. Developed on macOS against the
+client at `/Applications/World of Warcraft/_classic_beta_`, with an offline
+test harness so addons can be checked without launching the game.
+
+Measured client facts are in [CLAUDE.md](CLAUDE.md) under "Measured on this
+Mac". Addons: **HunterHUD** (dead zone and range light, ammo counter),
+**BuffReminder** (missing self-buffs, pet, pet food, Aspect), **ForeverProbe**
+and **HunterProbe** (the measurement tools).
 
 The first two addons are probes. They exist to answer, from the live client, the
 questions every later addon depends on: whether SavedVariables come back from
