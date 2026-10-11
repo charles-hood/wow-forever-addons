@@ -33,9 +33,13 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
   disagreed with Auto Shot for one sample near 10 yd, so it is only a fallback.
   Wing Clip (2974, 5 yd) answers true in melee and flickers as the mob moves.
   Item range checks answer within the first sample after RequestLoadItemDataByID.
-- **The popup was the combat log.** With COMBAT_LOG_EVENT_UNFILTERED out of the
-  automatic event test, zero ADDON_ACTION_FORBIDDEN events fired. Registering it
-  is a forbidden action on this client.
+- **The popup was the combat log, confirmed directly.** `/fp events full` in
+  session 4 logged ADDON_ACTION_FORBIDDEN once "during RegisterEvent
+  COMBAT_LOG_EVENT_UNFILTERED" and once "during UnregisterEvent
+  COMBAT_LOG_EVENT_UNFILTERED", nothing else. Never register that event.
+- **HunterHUD ran clean in session 4**: loaded alongside both probes, two fights,
+  zero Lua errors, frame visible with the ammo count. Not yet watched during a
+  dead-zone pass; `/hh debug on` logs its state changes through ForeverProbe.
 - `PLAYER_SWING` carries swingType 2 for Auto Shot (2.091 s on the test hunter) and 0 for
   main-hand swings (2.4 s). `PLAYER_SWING_RANGE_UPDATE` fires once per type at login
   with checksRange false and never again; swing range is closed to addons.
