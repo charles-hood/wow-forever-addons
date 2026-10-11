@@ -10,9 +10,10 @@ secret value in combat, and what the planned hunter addon can read about range,
 ammo and auras. Everything they measure is written into SavedVariables so it can
 be read from disk after a session with `scripts/read-probe.py`.
 
-The first real addon built on those answers is **HunterHUD**: a dead-zone and
-range light plus an ammo counter. Client facts measured so far are collected in
-`CLAUDE.md` under "Measured on this Mac".
+The addons built on those answers so far: **HunterHUD**, a dead-zone and range
+light plus an ammo counter, and **BuffReminder**, out-of-combat icons for
+missing self-buffs. Client facts measured so far are collected in `CLAUDE.md`
+under "Measured on this Mac".
 
 ## Layout
 
@@ -22,6 +23,7 @@ addons/ForeverProbe/     platform probe: SavedVariables lifecycle, build facts, 
                          event watch, ring-buffer log shared by other probes   /fp
 addons/HunterProbe/      range and dead zone, ammo slot and bags, auras, swing events   /hp
 addons/HunterHUD/        hunter HUD: range light, dead zone, melee dot, ammo counter      /hh
+addons/BuffReminder/     out-of-combat icons for missing self-buffs, pet, Aspect           /br
 scripts/deploy.sh        symlink (or --copy) the addons into the client
 scripts/seed-probe.sh    pre-seed ForeverProbe's SavedVariables files for the cold-start test
 scripts/read-probe.py    parse the SavedVariables file and print the report and log
@@ -40,8 +42,8 @@ scripts/deploy.sh             # symlink addons into the client
 scripts/seed-probe.sh         # with the game closed: seed the SavedVariables files
 ```
 
-Then launch the beta, enable **ForeverProbe**, **HunterProbe** and
-**HunterHUD** on the character-select AddOns screen, and log in. ForeverProbe prints the
+Then launch the beta, enable **ForeverProbe**, **HunterProbe**, **HunterHUD**
+and **BuffReminder** on the character-select AddOns screen, and log in. ForeverProbe prints the
 SavedVariables verdict in chat on login. Play a little (target something, fight
 something, open bags), then log out fully. Read what happened:
 
@@ -71,6 +73,25 @@ is targeted.
 
 `/hh` prints the commands: `on|off`, `lock|unlock` (drag when unlocked), `reset`,
 `scale 0.5..2`, `warn N`, `crit N`, `debug on|off`, `status`.
+
+## BuffReminder
+
+A row of spell icons that appears out of combat when something you would keep
+up is missing, and disappears when it is back. Nothing is shown in combat,
+because aura reads throw there on this client; it re-checks half a second after
+combat ends. Checks match buffs by name, so ranks do not matter, and a check is
+only active once the spell is in your spellbook.
+
+Default checks: Hunter (any Aspect, pet present and alive; Hunter's Mark on a
+live hostile target is off by default), Druid (Mark of the Wild or Gift of the
+Wild; Thorns off by default), Mage (Arcane Intellect or Brilliance; any Armor),
+Priest (Fortitude; Inner Fire), Warlock (Demon Skin or Armor; pet), Paladin
+(any Blessing), Shaman (Lightning Shield, off by default), Warrior (Battle
+Shout, off by default). The table is `ns.CHECKS` at the top of the file.
+
+`/br` prints the commands and this class's checks with their state:
+`on|off [KEY]`, `test` (show everything for five seconds to place the frame),
+`lock|unlock`, `reset`, `scale`, `debug on|off`, `status`.
 
 ## In-game commands
 

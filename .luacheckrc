@@ -8,6 +8,7 @@ globals = {
   "ForeverProbeCharDB",
   "HunterProbeDB",
   "HunterHUDDB",
+  "BuffReminderDB",
   "ForeverProbe",
   "SlashCmdList",
   "SLASH_FOREVERPROBE1",
@@ -16,6 +17,8 @@ globals = {
   "SLASH_HUNTERPROBE2",
   "SLASH_HUNTERHUD1",
   "SLASH_HUNTERHUD2",
+  "SLASH_BUFFREMINDER1",
+  "SLASH_BUFFREMINDER2",
 }
 read_globals = {
   "APIDocumentation_LoadUI",
@@ -2082,6 +2085,7 @@ read_globals = {
   "GMSurveySubmit",
   "GameDialog_MoneyFrameOnLoad",
   "GameFontHighlight",
+  "GameFontHighlightSmall",
   "GameFontNormal",
   "GameFontNormalLarge",
   "GameLimitedMode_GetLevelLimit",

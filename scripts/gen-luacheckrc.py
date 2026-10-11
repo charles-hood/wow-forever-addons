@@ -13,12 +13,13 @@ Enum NUM_BAG_SLOTS INVSLOT_AMMO INVSLOT_RANGED INVSLOT_MAINHAND INVSLOT_OFFHAND
 WOW_PROJECT_ID WOW_PROJECT_MAINLINE WOW_PROJECT_CLASSIC LE_EXPANSION_LEVEL_CURRENT
 UIParent GameTooltip Minimap PixelUtil loadstring_untainted GetClassicExpansionLevel
 IsMacClient GetLocale GetRealmName ReloadUI CreateMacro UnitPowerType
-GameFontNormal GameFontNormalLarge GameFontHighlight
+GameFontNormal GameFontNormalLarge GameFontHighlight GameFontHighlightSmall UnitIsDeadOrGhost
 """.split()
 
 OUR_GLOBALS = """
-ForeverProbeDB ForeverProbeCharDB HunterProbeDB HunterHUDDB ForeverProbe SlashCmdList
+ForeverProbeDB ForeverProbeCharDB HunterProbeDB HunterHUDDB BuffReminderDB ForeverProbe SlashCmdList
 SLASH_FOREVERPROBE1 SLASH_FOREVERPROBE2 SLASH_HUNTERPROBE1 SLASH_HUNTERPROBE2 SLASH_HUNTERHUD1 SLASH_HUNTERHUD2
+SLASH_BUFFREMINDER1 SLASH_BUFFREMINDER2
 """.split()
 
 

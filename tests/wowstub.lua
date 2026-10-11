@@ -78,7 +78,9 @@ _G.geterrorhandler = function() return errorHandler end
 Stub.units = { player = true, target = true }
 _G.UnitExists = function(u) return Stub.units[u] == true end
 _G.UnitCanAttack = function(_, u) return u == "target" end
-_G.UnitIsDead = function() return false end
+Stub.dead = {}
+_G.UnitIsDead = function(u) return Stub.dead[u] == true end
+_G.UnitIsDeadOrGhost = function(u) return Stub.dead[u] == true end
 _G.UnitGUID = function(u) return "Creature-0-1-2-3-" .. u end
 _G.UnitName = function(u) if u == "player" then return "Testhunter" end return Stub.combat and Stub.SECRET or "Kobold" end
 _G.UnitHealth = function() return Stub.combat and Stub.SECRET or 100 end
@@ -148,21 +150,28 @@ _G.C_Spell = {
 	GetSpellTexture = function() return 1 end,
 	GetSpellCooldownDuration = function() return {} end,
 }
+Stub.knownSpells = { [75] = true, [2973] = true, [1130] = true }
 _G.C_SpellBook = {
-	IsSpellKnown = function(id) return id == 75 or id == 2973 end,
-	IsSpellKnownOrInSpellBook = function(id) return id == 75 or id == 2973 or id == 1130 end,
+	IsSpellKnown = function(id) return Stub.knownSpells[id] == true end,
+	IsSpellKnownOrInSpellBook = function(id) return Stub.knownSpells[id] == true end,
 	GetSpellBookItemInfo = function() end,
 	GetNumSpellBookSkillLines = function() return 2 end,
 	GetSpellBookSkillLineInfo = function() end,
 }
 Stub.auras = { { name = "Aspect of the Hawk", spellId = 13165, duration = 0, expirationTime = 0 }, { name = "Mark of the Wild", spellId = 1126, duration = 1800, expirationTime = 2500 } }
+Stub.targetAuras = {}
 _G.C_UnitAuras = {
 	GetAuraDataByIndex = function(_, i)
 		if Stub.combat then error("attempt to access a secret aura") end
 		return Stub.auras[i]
 	end,
 	GetPlayerAuraBySpellID = function(id) for _, a in ipairs(Stub.auras) do if a.spellId == id then return a end end return nil end,
-	GetAuraDataBySpellName = function() end,
+	GetAuraDataBySpellName = function(unit, name)
+		if Stub.combat then error("attempt to access a secret aura") end
+		local list = (unit == "target") and Stub.targetAuras or Stub.auras
+		for _, a in ipairs(list) do if a.name == name then return a end end
+		return nil
+	end,
 	GetAuraDuration = function() return {} end,
 }
 _G.C_Secrets = {
@@ -241,7 +250,7 @@ function Stub.tick()
 end
 
 -- frames, textures, font strings and animations: enough widget surface for the HUD
-_G.GameFontNormal, _G.GameFontNormalLarge, _G.GameFontHighlight = {}, {}, {}
+_G.GameFontNormal, _G.GameFontNormalLarge, _G.GameFontHighlight, _G.GameFontHighlightSmall = {}, {}, {}, {}
 
 local function newWidget(kind)
 	local w = { kind = kind, events = {}, scripts = {}, points = {}, shown = true, text = "", children = {}, alpha = 1, scale = 1 }
@@ -273,7 +282,8 @@ local function newWidget(kind)
 	function w:SetClampedToScreen() end
 	function w:StartMoving() self.moving = true end
 	function w:StopMovingOrSizing() self.moving = false; self.points = { { "TOPLEFT", _G.UIParent, "TOPLEFT", 40, -60 } } end
-	function w:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
+	function w:SetColorTexture(r, g, b, a) self.color = { r, g, b, a }; self.texture = nil end
+	function w:SetTexture(t) self.texture = t end
 	function w:SetVertexColor(r, g, b, a) self.color = { r, g, b, a } end
 	function w:SetText(t) self.text = t end
 	function w:GetText() return self.text end

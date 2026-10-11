@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Buff Reminder
+## Notes: Shows what is missing out of combat: your self-buffs, your pet, your Aspect. Hidden in combat. Type /br
+## Author: Charles Hood
+## Version: 0.1.0
+## IconTexture: Interface\Icons\Spell_Nature_Regeneration
+## SavedVariables: BuffReminderDB
+
+BuffReminder.lua
