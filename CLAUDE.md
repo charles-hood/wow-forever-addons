@@ -110,6 +110,14 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
 - I cannot run the game. Charles plays, logs out (or `/reload`), and I read
   `scripts/read-probe.py` output. Every measurement must land in `ForeverProbeDB`
   through `ForeverProbe.info/debug/...` so it is readable from disk.
+- Porting report: `/fp port` in game, `scripts/read-probe.py --port` from disk.
+  Errors are attributed and classified at capture time (missing-api,
+  unknown-event, secret-value, nil-index, other). `/fp trace on` is the nil-global
+  tracer: a metamethod on `_G`, which taints Blizzard code paths until `/reload`,
+  so it is opt in, never restored across sessions, and never for a fight. The
+  report is validated offline only; Charles does not want third-party addons
+  loaded into his client to exercise it, so an in-game run waits for a real
+  porting need.
 - Addon style follows tobarisu: small, slash commands, no Ace3, no options panel,
   one `SavedVariables` table per addon, tabs for indentation.
 - New addon: folder `addons/Name/` with `Name.toc` (`## Interface: 16001`), add it
