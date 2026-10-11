@@ -122,7 +122,7 @@ _G.C_Item = {
 	GetItemInfo = function() end,
 	GetItemCount = function() return 0 end,
 }
-Stub.bags = { [0] = { 16, { [1] = { 2512, 200 }, [2] = { 4496, 1 } } }, [1] = { 18, { [3] = { 2512, 57 } } } }
+Stub.bags = { [0] = { 16, { [1] = { 2512, 200 }, [2] = { 4496, 1 }, [3] = { 2287, 5 } } }, [1] = { 18, { [3] = { 2512, 57 } } } }
 Stub.bagItems = { [1] = 2101 }
 _G.C_Container = {
 	GetContainerNumSlots = function(bag) local b = Stub.bags[bag]; return b and b[1] or 0 end,
@@ -152,6 +152,7 @@ _G.C_Spell = {
 }
 Stub.knownSpells = { [75] = true, [2973] = true, [1130] = true }
 _G.C_SpellBook = {
+	HasPetSpells = function() return 6, "PET" end,
 	IsSpellKnown = function(id) return Stub.knownSpells[id] == true end,
 	IsSpellKnownOrInSpellBook = function(id) return Stub.knownSpells[id] == true end,
 	GetSpellBookItemInfo = function() end,
@@ -183,6 +184,22 @@ _G.C_Secrets = {
 	ShouldSpellCooldownBeSecret = function() return false end,
 	GetSpellAuraSecrecy = function() return 2 end,
 	ShouldUnitThreatStateBeSecret = function() return true end,
+	ShouldUnitStatsBeSecret = function() return false end,
+}
+_G.Enum.PowerType.Happiness = 4
+Stub.pet = { happiness = 3, damage = 125, loyaltyRate = 10, loyalty = "Best Friend", foods = { "Meat", "Fish" }, edible = { [2287] = true } }
+_G.UnitCreatureFamily = function(u) if u == "pet" then return "Bear" end end
+_G.GetPetExperience = function() return 120, 500 end
+_G.GetPetTimeRemaining = function() return nil end
+_G.C_PetInfo = {
+	GetPetHappiness = function()
+		if Stub.combat and Stub.secretPet then return Stub.SECRET, Stub.SECRET, Stub.SECRET end
+		return Stub.pet.happiness, Stub.pet.damage, Stub.pet.loyaltyRate
+	end,
+	GetPetLoyalty = function() return Stub.pet.loyalty end,
+	GetPetTrainingPoints = function() return 12, 4 end,
+	GetPetFoodTypes = function() return Stub.pet.foods end,
+	CanPetEatItem = function(id) return Stub.pet.edible[id] == true end,
 }
 _G.C_SwingTimer = {
 	IsTargetWithinSwingRange = function() return nil end,

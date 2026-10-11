@@ -155,6 +155,7 @@ check(ForeverProbeDB.history[1].charVerdict == "per-character file: NOT LOADED",
 -- E. HunterProbe on top of a live ForeverProbe
 ------------------------------------------------------------------
 ns = startSession({ sessions = 3 }, { sessions = 3 }, false)
+Stub.units.pet = true
 local hp = Stub.loadAddon("addons/HunterProbe", "HunterProbe", { "HunterProbe.lua" })
 Stub.fire("ADDON_LOADED", "HunterProbe")
 Stub.fire("PLAYER_ENTERING_WORLD", true, false)
@@ -166,7 +167,7 @@ check(logContains("range sampling on"), "range sampling starts at login")
 check(logContains("swing logging on"), "swing logging enabled at login")
 check(logContains("EnableRangeCheck 0:ok 2:ok"), "EnableRangeCheck called with (swingType, enable)")
 check(logContains("auras(login)"), "login aura report logged")
-for _, cmd in ipairs({ "", "status", "range", "ammo", "auras", "swing off", "swing on", "range on", "range off", "bogus" }) do
+for _, cmd in ipairs({ "", "status", "range", "ammo", "auras", "pet", "swing off", "swing on", "range on", "range off", "bogus" }) do
 	local ok, err = pcall(hp.handleSlash, cmd)
 	check(ok, "/hp " .. cmd .. " raised: " .. tostring(err))
 end
@@ -175,6 +176,26 @@ check(HunterProbeDB.lastAmmo.count == "143", "ammo slot count read")
 check(#HunterProbeDB.lastAmmo.quivers == 1, "quiver detected")
 check(HunterProbeDB.lastRange and HunterProbeDB.lastRange.zone == "RANGED", "range classification RANGED, got " .. tostring(HunterProbeDB.lastRange and HunterProbeDB.lastRange.zone))
 check(#HunterProbeDB.lastAuras.lines == 2, "two auras listed")
+check(logContains("pet watch on (UNIT_HAPPINESS=true, PET_UI_UPDATE=true, UNIT_PET=true)"), "pet events registered at login")
+check(logContains("pet(login): pet \"Kobold\" (\"Bear\", L12, dead=false): happiness/dmg%/loyaltyRate=3, 125, 10 | loyalty=\"Best Friend\""), "pet sample logged at login")
+check(logContains("foods={Meat, Fish}"), "food types joined")
+check(logContains("pet food: 1 of 4 bag items edible"), "edible bag item found")
+check(HunterProbeDB.lastPet and HunterProbeDB.lastPet.happiness == "3, 125, 10", "pet sample stored")
+Stub.pet.happiness = 2
+Stub.fire("UNIT_HAPPINESS", "pet")
+check(logContains("UNIT_HAPPINESS #1 unit=\"pet\" -> pet \"Kobold\""), "happiness event logged with a fresh sample")
+check(logContains("happiness/dmg%/loyaltyRate=2, 125, 10"), "happiness change visible in the sample")
+Stub.combat = true
+Stub.secretPet = true
+local okp, perr = pcall(hp.handleSlash, "pet")
+check(okp, "/hp pet with secret answers does not raise: " .. tostring(perr))
+check(logContains("happiness/dmg%/loyaltyRate=<secret number>, <secret number>, <secret number>"), "secret happiness described")
+Stub.combat = false
+Stub.secretPet = false
+Stub.units.pet = nil
+Stub.fire("UNIT_PET", "player")
+check(logContains("UNIT_PET: pet: none"), "pet loss sampled")
+Stub.units.pet = true
 
 -- sampling logs transitions only
 hp.handleSlash("range on")

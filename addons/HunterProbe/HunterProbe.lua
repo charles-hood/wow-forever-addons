@@ -7,6 +7,7 @@
 --   /hp range on     sample range checks twice a second and log every change
 --   /hp ammo         what is in the ammo slot, quivers, and projectile stacks in bags
 --   /hp auras        the player's buffs with per-field secrecy
+--   /hp pet          pet happiness, loyalty, food, and whether any of it is secret
 --   /hp swing on     log PLAYER_SWING and PLAYER_SWING_RANGE_UPDATE
 
 local ADDON, ns = ...
@@ -408,6 +409,169 @@ local function reportAuras(reason)
 end
 
 ------------------------------------------------------------------------
+-- pet happiness
+------------------------------------------------------------------------
+-- The client documents C_PetInfo.GetPetHappiness() -> happiness, damagePercentage,
+-- loyaltyRate, plus GetPetLoyalty, GetPetFoodTypes, CanPetEatItem, and a
+-- UNIT_HAPPINESS event. This measures whether the answers are plain or secret,
+-- in and out of combat, and whether the event fires.
+
+local HAPPINESS_POWER = (_G.Enum and _G.Enum.PowerType and _G.Enum.PowerType.Happiness) or 4
+local FEED_PET_EFFECT = "Feed Pet Effect"
+
+local function callDesc(path, ...)
+	local ok, a, b, c = call(path, ...)
+	if ok == nil then
+		return "missing"
+	end
+	if not ok then
+		return "ERR " .. str(a)
+	end
+	local parts = { describe(a) }
+	if b ~= nil then parts[#parts + 1] = describe(b) end
+	if c ~= nil then parts[#parts + 1] = describe(c) end
+	return table.concat(parts, ", ")
+end
+
+local function joinTable(t)
+	if type(t) ~= "table" then
+		return describe(t)
+	end
+	local parts = {}
+	for i = 1, #t do
+		parts[#parts + 1] = str(t[i])
+	end
+	return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+-- One sample of everything pet-related; returns the table and a one-line summary.
+local function samplePet(reason)
+	local p = { at = GetServerTime(), reason = reason }
+	local okE, exists = call("UnitExists", "pet")
+	p.exists = okE and describe(exists) or ("ERR " .. str(exists))
+	if not (okE and exists == true) then
+		return p, "pet: none"
+	end
+	local okN, name = call("UnitName", "pet")
+	p.name = okN and describe(name) or ("ERR " .. str(name))
+	local okD, dead = call("UnitIsDead", "pet")
+	p.dead = okD and describe(dead) or ("ERR " .. str(dead))
+	local okL, level = call("UnitLevel", "pet")
+	p.level = okL and describe(level) or ("ERR " .. str(level))
+	local okF, family = call("UnitCreatureFamily", "pet")
+	p.family = okF and describe(family) or ("ERR " .. str(family))
+	p.happiness = callDesc("C_PetInfo.GetPetHappiness")
+	p.loyalty = callDesc("C_PetInfo.GetPetLoyalty")
+	p.trainingPoints = callDesc("C_PetInfo.GetPetTrainingPoints")
+	local okT, foods = call("C_PetInfo.GetPetFoodTypes")
+	p.foodTypes = (okT == nil) and "missing" or (okT and joinTable(foods) or ("ERR " .. str(foods)))
+	p.experience = callDesc("GetPetExperience")
+	p.timeRemaining = callDesc("GetPetTimeRemaining")
+	p.powerHappiness = callDesc("UnitPower", "pet", HAPPINESS_POWER)
+	p.powerHappinessMax = callDesc("UnitPowerMax", "pet", HAPPINESS_POWER)
+	p.powerHappinessSecret = callDesc("C_Secrets.ShouldUnitPowerBeSecret", "pet", HAPPINESS_POWER)
+	p.statsSecret = callDesc("C_Secrets.ShouldUnitStatsBeSecret", "pet")
+	p.hasPetSpells = callDesc("C_SpellBook.HasPetSpells")
+	local okA, aura = call("C_UnitAuras.GetAuraDataBySpellName", "pet", FEED_PET_EFFECT, "HELPFUL")
+	p.feeding = (okA == nil) and "missing" or (okA and (aura and "yes" or "no") or ("ERR " .. str(aura)))
+	-- the Classic pet frame had a happiness icon; see whether anything like it exists here
+	local hf = _G.PetFrameHappiness
+	if hf then
+		local okC, l, r, t, b = pcall(function() return hf:GetTexCoord() end)
+		p.frameHappiness = okC and ("texcoord " .. str(l) .. "," .. str(r) .. "," .. str(t) .. "," .. str(b)) or ("ERR " .. str(l))
+		local okS, shown = pcall(function() return hf:IsShown() end)
+		p.frameHappinessShown = okS and describe(shown) or "?"
+	else
+		p.frameHappiness = "no PetFrameHappiness global"
+	end
+	local summary = ("pet %s (%s, L%s, dead=%s): happiness/dmg%%/loyaltyRate=%s | loyalty=%s | power4=%s/%s (secret=%s) | foods=%s | feeding=%s | training=%s | frame=%s"):format(
+		p.name, p.family, p.level, p.dead, p.happiness, p.loyalty, p.powerHappiness, p.powerHappinessMax, p.powerHappinessSecret,
+		p.foodTypes, p.feeding, p.trainingPoints, p.frameHappiness)
+	return p, summary
+end
+
+-- Which items in the bags the pet can eat, with CanPetEatItem's answer per item.
+local function petFood()
+	local numBags = _G.NUM_BAG_SLOTS or 4
+	local edible, checked = {}, 0
+	for bag = 0, numBags do
+		local okN, slots = call("C_Container.GetContainerNumSlots", bag)
+		if okN and type(slots) == "number" then
+			for slot = 1, slots do
+				local okS, cinfo = call("C_Container.GetContainerItemInfo", bag, slot)
+				if okS and type(cinfo) == "table" then
+					local okR, itemID, link = pcall(function() return cinfo.itemID, cinfo.hyperlink end)
+					if okR and type(itemID) == "number" then
+						checked = checked + 1
+						local okC, can = call("C_PetInfo.CanPetEatItem", itemID)
+						if okC == nil then
+							return nil, "C_PetInfo.CanPetEatItem missing"
+						elseif not okC then
+							edible[#edible + 1] = itemID .. ":ERR " .. str(can)
+						elseif can == true then
+							edible[#edible + 1] = str(link or itemID)
+						elseif FP.issecret(can) then
+							edible[#edible + 1] = itemID .. ":<secret>"
+						end
+					end
+				end
+			end
+		end
+	end
+	return edible, checked
+end
+
+local lastHappiness
+
+local function reportPet(reason)
+	reason = reason or "manual"
+	local p, summary = samplePet(reason)
+	say("%s", summary)
+	info("pet(%s): %s", reason, summary)
+	if p.exists == "true" then
+		local edible, checked = petFood()
+		if edible then
+			say("  edible in bags (%s items checked): %s", checked, #edible > 0 and table.concat(edible, " ") or "none")
+			info("pet food: %s of %s bag items edible: %s", #edible, checked, table.concat(edible, " "))
+			p.edible = edible
+		else
+			say("  %s", checked)
+		end
+	end
+	settings().lastPet = p
+	lastHappiness = p.happiness
+	return p
+end
+
+local petFrame = CreateFrame("Frame")
+local happinessEvents = 0
+
+petFrame:SetScript("OnEvent", function(_, event, a1)
+	if event == "UNIT_HAPPINESS" then
+		happinessEvents = happinessEvents + 1
+		local p, summary = samplePet("UNIT_HAPPINESS")
+		if happinessEvents <= 50 or p.happiness ~= lastHappiness then
+			info("UNIT_HAPPINESS #%s unit=%s -> %s", happinessEvents, describe(a1), summary)
+		end
+		lastHappiness = p.happiness
+	elseif event == "PET_UI_UPDATE" or event == "UNIT_PET" then
+		if event == "UNIT_PET" and a1 ~= "player" then
+			return
+		end
+		local _, summary = samplePet(event)
+		debug("%s: %s", event, summary)
+	end
+end)
+
+local function startPetWatch()
+	local okA = FP.safeRegister(petFrame, "UNIT_HAPPINESS", SRC)
+	local okB = FP.safeRegister(petFrame, "PET_UI_UPDATE", SRC)
+	local okC = FP.safeRegister(petFrame, "UNIT_PET", SRC)
+	info("pet watch on (UNIT_HAPPINESS=%s, PET_UI_UPDATE=%s, UNIT_PET=%s)", tostring(okA), tostring(okB), tostring(okC))
+end
+ns.samplePet = samplePet
+
+------------------------------------------------------------------------
 -- swing events
 ------------------------------------------------------------------------
 
@@ -498,9 +662,11 @@ frame:SetScript("OnEvent", function(_, event, a1, a2)
 		if d.range then
 			setRangeSampling(true)
 		end
+		startPetWatch()
 		later(4, function()
 			reportAuras("login")
 			ammoTick("login")
+			reportPet("login")
 		end)
 		say("type /hp for commands")
 	elseif event == "PLAYER_REGEN_DISABLED" then
@@ -508,11 +674,15 @@ frame:SetScript("OnEvent", function(_, event, a1, a2)
 			reportAuras("combatStart")
 			local out, sig = sampleRange("target")
 			info("combatStart range: zone=%s | %s", out.zone or "-", sig)
+			local _, petSummary = samplePet("combatStart")
+			info("combatStart %s", petSummary)
 		end)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		later(0.5, function()
 			reportAuras("combatEnd")
 			ammoTick("combatEnd")
+			local _, petSummary = samplePet("combatEnd")
+			info("combatEnd %s", petSummary)
 		end)
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		lastSig = nil
@@ -540,6 +710,7 @@ local function menu()
 	print("  /hp range on|off     sample every 0.5 s, log changes")
 	print("  /hp ammo             ammo slot, quivers, projectile stacks")
 	print("  /hp auras            player buffs with secrecy per field")
+	print("  /hp pet              happiness, loyalty, food types, edible bag items, secrecy")
 	print("  /hp swing on|off     log the swing events")
 	print("  /hp status")
 end
@@ -560,6 +731,8 @@ local function handle(msg)
 		reportAmmo()
 	elseif cmd == "auras" then
 		reportAuras("manual")
+	elseif cmd == "pet" then
+		reportPet("manual")
 	elseif cmd == "swing" then
 		setSwing(rest ~= "off")
 	elseif cmd == "status" then
