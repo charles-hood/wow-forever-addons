@@ -428,6 +428,48 @@ end)
 -- slash
 ------------------------------------------------------------------------
 
+-- /br check: print what every active check sees right now, in chat
+local function explain()
+	if call(InCombatLockdown) == true then
+		say("in combat: auras are unreadable here, so every check is paused")
+		return
+	end
+	local buffs = playerBuffs()
+	if buffs == nil then
+		say("auras are unreadable right now (secret or the API threw); nothing is shown")
+		return
+	end
+	local names = {}
+	for n in pairs(buffs) do
+		names[#names + 1] = n
+	end
+	table.sort(names)
+	say(("%s buffs read: %s"):format(#names, #names > 0 and table.concat(names, ", ") or "none"))
+	local tname = call(UnitName, "target")
+	if call(UnitExists, "target") == true then
+		say(("target: %s, hostile=%s, dead=%s"):format(tostring(tname), tostring(call(UnitCanAttack, "player", "target")),
+			tostring(call(UnitIsDead, "target"))))
+	else
+		say("target: none")
+	end
+	if #activeChecks == 0 then
+		say("no active checks for this class yet (spells not known, or none defined)")
+		return
+	end
+	for _, c in ipairs(activeChecks) do
+		local ok, label = c.test(buffs)
+		local state
+		if not checkEnabled(c) then
+			state = "off (" .. (ok == true and "would be satisfied" or "would show " .. tostring(label or c.label)) .. ")"
+		elseif ok == true then
+			state = "ok"
+		else
+			state = "MISSING -> showing " .. tostring(label or c.label)
+		end
+		say(("  %-10s %s"):format(c.key, state))
+	end
+end
+
 local function listChecks()
 	if not classFile then
 		say("not logged in yet")
@@ -463,6 +505,7 @@ local function menu()
 	say("commands:")
 	print("  /br on | off            whole addon")
 	print("  /br on KEY | off KEY    one check (keys listed below)")
+	print("  /br check               print what each check sees right now")
 	print("  /br test                show every check for five seconds, to place the frame")
 	print("  /br lock | unlock | reset | scale 0.5..2 | debug on|off | status")
 end
@@ -493,6 +536,8 @@ local function handle(msg)
 			end
 		end
 		status()
+	elseif cmd == "check" then
+		explain()
 	elseif cmd == "test" then
 		forceAll = true
 		evaluate("test")

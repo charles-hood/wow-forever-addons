@@ -90,7 +90,8 @@ Priest (Fortitude; Inner Fire), Warlock (Demon Skin or Armor; pet), Paladin
 Shout, off by default). The table is `ns.CHECKS` at the top of the file.
 
 `/br` prints the commands and this class's checks with their state:
-`on|off [KEY]`, `test` (show everything for five seconds to place the frame),
+`on|off [KEY]`, `check` (print what each check sees right now), `test` (show
+everything for five seconds to place the frame),
 `lock|unlock`, `reset`, `scale`, `debug on|off`, `status`.
 
 ## In-game commands

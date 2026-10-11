@@ -122,6 +122,18 @@ settle()
 check(not f:IsShown(), "mark check off by default")
 ns.handleSlash("on mark")
 check(f:IsShown() and labels(f) == "Hunter's Mark", "mark missing on a hostile target, got " .. labels(f))
+Stub.printed = {}
+ns.handleSlash("check")
+local joined = table.concat(Stub.printed, "\n")
+check(joined:find("1 buffs read: Aspect of the Hawk", 1, true) ~= nil, "check lists the buffs read")
+check(joined:find("target: Kobold, hostile=true, dead=false", 1, true) ~= nil, "check describes the target")
+check(joined:find("mark       MISSING -> showing Hunter's Mark", 1, true) ~= nil, "check explains the missing mark: " .. joined)
+check(joined:find("aspect     ok", 1, true) ~= nil, "check reports a satisfied check")
+Stub.combat = true
+Stub.printed = {}
+ns.handleSlash("check")
+check(table.concat(Stub.printed, "\n"):find("in combat", 1, true) ~= nil, "check explains the combat pause")
+Stub.combat = false
 Stub.targetAuras = { { name = "Hunter's Mark" } }
 Stub.fire("UNIT_AURA", "target")
 settle()
@@ -139,7 +151,7 @@ settle()
 check(not f:IsShown(), "aspect not known yet: no nag")
 
 -- slash commands
-for _, cmd in ipairs({ "", "status", "test", "lock", "unlock", "reset", "scale 1.3", "scale 5", "debug on", "debug off", "on", "off", "on", "on bogus", "off aspect", "on aspect" }) do
+for _, cmd in ipairs({ "", "status", "check", "test", "lock", "unlock", "reset", "scale 1.3", "scale 5", "debug on", "debug off", "on", "off", "on", "on bogus", "off aspect", "on aspect" }) do
 	local okc, e = pcall(ns.handleSlash, cmd)
 	check(okc, "/br " .. cmd .. " raised: " .. tostring(e))
 end
