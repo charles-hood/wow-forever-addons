@@ -3,6 +3,7 @@
 ## Notes: Client facts, SavedVariables round-trip test, API presence, error capture, event watch. Type /fp
 ## Author: Charles Hood
 ## Version: 0.1.0
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## SavedVariables: ForeverProbeDB
 ## SavedVariablesPerCharacter: ForeverProbeCharDB
 

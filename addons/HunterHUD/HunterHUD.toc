@@ -3,6 +3,7 @@
 ## Notes: Dead-zone and range light plus an ammo counter for hunters. Type /hh
 ## Author: Charles Hood
 ## Version: 0.1.0
+## IconTexture: Interface\Icons\Ability_Marksmanship
 ## SavedVariables: HunterHUDDB
 
 HunterHUD.lua

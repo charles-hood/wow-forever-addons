@@ -37,9 +37,10 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
   session 4 logged ADDON_ACTION_FORBIDDEN once "during RegisterEvent
   COMBAT_LOG_EVENT_UNFILTERED" and once "during UnregisterEvent
   COMBAT_LOG_EVENT_UNFILTERED", nothing else. Never register that event.
-- **HunterHUD ran clean in session 4**: loaded alongside both probes, two fights,
-  zero Lua errors, frame visible with the ammo count. Not yet watched during a
-  dead-zone pass; `/hh debug on` logs its state changes through ForeverProbe.
+- **HunterHUD validated in game (sessions 4 and 5).** With `/hh debug on`, every
+  light change (RANGED, DEAD, OUT, NONE on the kill) matched HunterProbe's
+  sampler within 0.1 s across three fights, zero Lua errors. Addon icons use
+  `## IconTexture` in the TOC, which this engine honours.
 - `PLAYER_SWING` carries swingType 2 for Auto Shot (2.091 s on the test hunter) and 0 for
   main-hand swings (2.4 s). `PLAYER_SWING_RANGE_UPDATE` fires once per type at login
   with checksRange false and never again; swing range is closed to addons.
