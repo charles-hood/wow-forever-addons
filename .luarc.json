@@ -1,0 +1,7 @@
+{
+  "runtime.version": "Lua 5.1",
+  "workspace.library": ["types"],
+  "workspace.checkThirdParty": false,
+  "diagnostics.globals": ["ForeverProbeDB", "ForeverProbeCharDB", "HunterProbeDB", "ForeverProbe", "SlashCmdList"],
+  "diagnostics.disable": ["lowercase-global"]
+}

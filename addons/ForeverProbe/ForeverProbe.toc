@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: Forever Probe
+## Notes: Client facts, SavedVariables round-trip test, API presence, error capture, event watch. Type /fp
+## Author: Charles Hood
+## Version: 0.1.0
+## SavedVariables: ForeverProbeDB
+## SavedVariablesPerCharacter: ForeverProbeCharDB
+
+Log.lua
+Probe.lua

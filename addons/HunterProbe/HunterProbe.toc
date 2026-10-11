@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Hunter Probe
+## Notes: Range, dead zone, ammo, aura and swing measurements for the planned hunter addon. Type /hp
+## Author: Charles Hood
+## Version: 0.1.0
+## Dependencies: ForeverProbe
+## SavedVariables: HunterProbeDB
+
+HunterProbe.lua

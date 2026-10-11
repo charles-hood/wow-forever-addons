@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Hunter HUD
+## Notes: Dead-zone and range light plus an ammo counter for hunters. Type /hh
+## Author: Charles Hood
+## Version: 0.1.0
+## SavedVariables: HunterHUDDB
+
+HunterHUD.lua
