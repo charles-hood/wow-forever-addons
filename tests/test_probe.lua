@@ -77,6 +77,53 @@ check(ns.probe.errorCount() == 2, "two unique errors captured")
 check(ForeverProbeDB.errors["other error"].count == 1 and ForeverProbeDB.errors["Interface/AddOns/X/X.lua:12: attempt to call a nil value"].count == 2, "error counts dedupe")
 check(Stub.lastBlizzardError == "other error", "errors chain to the previous handler")
 
+-- error classification and attribution for the porting report
+local h = geterrorhandler()
+h("Interface/AddOns/OldBags/Core.lua:88: attempt to call a nil value (global 'GetContainerItemInfo')")
+h("Interface/AddOns/OldBags/Core.lua:12: Frame:RegisterEvent(): Attempt to register unknown event \"UNIT_HEALTH_FREQUENT\"")
+h("Interface/AddOns/Meter/Threat.lua:650: attempt to perform boolean test on local 'isTanking' (a secret boolean value)")
+h("Interface/AddOns/Meter/Threat.lua:20: attempt to call a nil value (field 'GetSpellInfo')")
+h("some unattributed thing went wrong")
+local e1 = ForeverProbeDB.errors["Interface/AddOns/OldBags/Core.lua:88: attempt to call a nil value (global 'GetContainerItemInfo')"]
+check(e1 and e1.addon == "OldBags" and e1.kind == "missing-api" and e1.detail == "GetContainerItemInfo", "missing API call classified and attributed")
+local e2 = ForeverProbeDB.errors["Interface/AddOns/OldBags/Core.lua:12: Frame:RegisterEvent(): Attempt to register unknown event \"UNIT_HEALTH_FREQUENT\""]
+check(e2 and e2.kind == "unknown-event" and e2.detail == "UNIT_HEALTH_FREQUENT", "unknown event classified")
+local e3 = ForeverProbeDB.errors["Interface/AddOns/Meter/Threat.lua:650: attempt to perform boolean test on local 'isTanking' (a secret boolean value)"]
+check(e3 and e3.kind == "secret-value" and e3.detail == "boolean" and e3.addon == "Meter", "secret value error classified")
+local e5 = ForeverProbeDB.errors["some unattributed thing went wrong"]
+check(e5 and e5.addon == "unknown" and e5.kind == "other", "unattributed error falls back to unknown")
+Stub.fire("ADDON_ACTION_FORBIDDEN", "Meter", "CastSpellByName()")
+Stub.fire("ADDON_ACTION_FORBIDDEN", "Meter", "CastSpellByName()")
+check(ForeverProbeDB.report.actions.Meter["ADDON_ACTION_FORBIDDEN CastSpellByName()"] == 2, "forbidden actions counted per addon")
+
+-- tracer: nil-global lookups attributed by stack
+_G.debugstack = function() return "Interface/AddOns/OldBags/Core.lua:40: in function <Interface/AddOns/OldBags/Core.lua:38>" end
+check(ns.probe.setTrace(true), "tracer installs")
+local _ = _G.GetItemInfoNope
+local _ = _G.GetItemInfoNope
+local _ = _G.UnitAuraNope
+check(ForeverProbeDB.report.nilGlobals.OldBags.count == 3 and ForeverProbeDB.report.nilGlobals.OldBags.names.GetItemInfoNope.n == 2, "nil lookups counted per addon and name")
+_G.debugstack = function() return "Interface/AddOns/Blizzard_UIParent/UIParent.lua:1: in main chunk" end
+local _ = _G.SomeBlizzardCheck
+check(ForeverProbeDB.report.nilGlobals.Blizzard_UIParent == nil, "Blizzard lookups not recorded")
+ns.probe.setTrace(false)
+check(getmetatable(_G) == nil, "tracer removed the metatable")
+_G.debugstack = function() return "stack line 1\nstack line 2" end
+local _ = _G.AfterTraceNope
+check(ForeverProbeDB.report.nilGlobals.OldBags.count == 3, "no counting after the tracer is off")
+
+-- the chat report runs and stores a per-addon structure
+Stub.printed = {}
+local okp, perr = pcall(ns.handleSlash, "port")
+check(okp, "/fp port raised: " .. tostring(perr))
+local port = ForeverProbeDB.report.port
+check(port and port.addons.OldBags and #port.addons.OldBags.errors == 2 and port.addons.OldBags.nilGlobals.count == 3, "port report aggregates errors and nil globals per addon")
+check(port.addons.Meter and port.addons.Meter.actions["ADDON_ACTION_FORBIDDEN CastSpellByName()"] == 2, "port report carries forbidden actions")
+check(port.addons.ForeverProbe and port.addons.ForeverProbe.loaded == true, "port report carries load state from the addon list")
+local joined = table.concat(Stub.printed, "\n")
+check(joined:find("OldBags", 1, true) and joined:find("missing-api: GetContainerItemInfo x1", 1, true), "chat report names the missing API")
+ns.handleSlash("errors clear")
+
 -- combat snapshot with secret values must not throw
 Stub.combat = true
 Stub.fire("PLAYER_REGEN_DISABLED")
@@ -95,6 +142,7 @@ check(ForeverProbeDB.report.secrets.combatEnd ~= nil, "combatEnd snapshot exists
 -- every slash command runs without raising
 for _, cmd in ipairs({ "", "help", "status", "sv", "build", "api", "events", "secrets", "errors", "errors list", "errors 3",
 	"watch PLAYER_XP_UPDATE", "watch UNIT_HEALTH_FREQUENT", "unwatch PLAYER_XP_UPDATE", "unwatch all", "log", "log 5",
+	"port", "trace", "trace on", "trace off",
 	"verbose 3", "verbose 1", "scripterrors on", "scripterrors off", "json", "bogus", "errors clear", "clear" }) do
 	local ok, err = pcall(ns.handleSlash, cmd)
 	check(ok, "/fp " .. cmd .. " raised: " .. tostring(err))

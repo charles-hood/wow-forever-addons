@@ -24,6 +24,7 @@ local DEFAULT_SETTINGS = {
 	errors = true,     -- capture Lua errors
 	verbose = 1,
 	watch = {},        -- event names being logged
+	trace = false,     -- nil-global tracer (taints; opt in per session)
 }
 
 local probe = {}
@@ -372,6 +373,38 @@ end
 local inHandler = false
 local MAX_ERRORS = 100
 
+-- Which addon a message or stack belongs to: the first Interface/AddOns/<Name>/ in it.
+function probe.addonOf(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local name = text:match("Interface[/\\]AddOns[/\\]([^/\\:]+)")
+	return name
+end
+
+-- What kind of porting problem an error message describes.
+function probe.classifyError(msg)
+	if type(msg) ~= "string" then
+		return "other", nil
+	end
+	local g = msg:match("attempt to call a nil value %(global '([%w_]+)'%)")
+		or msg:match("attempt to call a nil value %(field '([%w_]+)'%)")
+	if g then
+		return "missing-api", g
+	end
+	local ev = msg:match('unknown event "([%w_]+)"')
+	if ev then
+		return "unknown-event", ev
+	end
+	if msg:find("secret", 1, true) then
+		return "secret-value", msg:match("%(a secret (%w+) value") or msg:match("Auras cannot be accessed") and "aura" or nil
+	end
+	if msg:find("attempt to index a nil value", 1, true) then
+		return "nil-index", msg:match("%(global '([%w_]+)'%)") or msg:match("%(field '([%w_]+)'%)")
+	end
+	return "other", nil
+end
+
 local function recordError(msg)
 	local d = _G.ForeverProbeDB
 	local store = type(d) == "table" and d or ns
@@ -388,7 +421,12 @@ local function recordError(msg)
 		return nil
 	end
 	local oks, stack = pcall(debugstack, 3, 12, 0)
-	e = { msg = key, count = 1, first = serverTime(), last = serverTime(), stack = oks and ns.str(stack) or nil }
+	local kind, detail = probe.classifyError(key)
+	e = {
+		msg = key, count = 1, first = serverTime(), last = serverTime(), stack = oks and ns.str(stack) or nil,
+		addon = probe.addonOf(key) or (oks and probe.addonOf(stack)) or "unknown",
+		kind = kind, detail = detail,
+	}
 	store.errors[key] = e
 	store.errorOrder[#store.errorOrder + 1] = key
 	return e
@@ -634,6 +672,7 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2)
 			for ev in pairs(settings().watch) do
 				ns.safeRegister(watchFrame, ev, SRC)
 			end
+			settings().trace = false
 		else
 			ns.trace("SV", "ADDON_LOADED %s", arg1)
 		end
@@ -673,12 +712,144 @@ frame:SetScript("OnEvent", function(_, event, arg1, arg2)
 	elseif event == "ADDON_ACTION_BLOCKED" or event == "ADDON_ACTION_FORBIDDEN" then
 		ns.forbiddenSeen = (ns.forbiddenSeen or 0) + 1
 		ns.warn(SRC, "%s: addon=%s function=%s during %s", event, arg1, arg2, ns.step or "(no probe step in flight)")
+		local r = report()
+		r.actions = r.actions or {}
+		local who = ns.str(arg1)
+		r.actions[who] = r.actions[who] or {}
+		local what = event .. " " .. ns.str(arg2) .. (ns.step and (" during " .. ns.step) or "")
+		r.actions[who][what] = (r.actions[who][what] or 0) + 1
 	elseif event == "LUA_WARNING" then
 		ns.warn(SRC, "LUA_WARNING: %s", arg1)
 	elseif event == "SAVED_VARIABLES_TOO_LARGE" then
 		ns.err(SRC, "SAVED_VARIABLES_TOO_LARGE for %s", arg1)
 	end
 end)
+
+------------------------------------------------------------------------
+-- porting report: nil-global tracer (opt in) and the per-addon summary
+------------------------------------------------------------------------
+-- The tracer puts an __index metamethod on _G. Every lookup of a global that
+-- does not exist then passes through addon code, which taints whatever was
+-- running, including Blizzard's own feature checks. That breaks protected UI
+-- in combat until the next /reload. So: opt in, out of combat, on a character
+-- you are not raiding with, and /reload when done.
+
+local MAX_TRACE_NAMES = 300
+local tracing = false
+local inTrace = false
+
+local function traceLookup(_, key)
+	if inTrace or type(key) ~= "string" then
+		return nil
+	end
+	inTrace = true
+	local oks, stack = pcall(debugstack, 2, 1, 0)
+	local who = (oks and probe.addonOf(stack)) or nil
+	if who and who:sub(1, 9) ~= "Blizzard_" then
+		local r = report()
+		r.nilGlobals = r.nilGlobals or {}
+		r.nilGlobals[who] = r.nilGlobals[who] or { count = 0, names = {} }
+		local bucket = r.nilGlobals[who]
+		bucket.count = bucket.count + 1
+		local entry = bucket.names[key]
+		if entry then
+			entry.n = entry.n + 1
+		elseif bucket.size == nil or bucket.size < MAX_TRACE_NAMES then
+			bucket.size = (bucket.size or 0) + 1
+			bucket.names[key] = { n = 1, at = oks and ns.str(stack):match("[^\n]*") or "?" }
+		end
+	end
+	inTrace = false
+	return nil
+end
+
+function probe.setTrace(on)
+	if on and not tracing then
+		local okm, existing = pcall(getmetatable, _G)
+		if okm and existing ~= nil then
+			ns.warn(SRC, "_G already has a metatable; tracer not installed")
+			return false
+		end
+		local ok, err = pcall(setmetatable, _G, { __index = traceLookup })
+		if not ok then
+			ns.warn(SRC, "setmetatable(_G) failed: %s", err)
+			return false
+		end
+		tracing = true
+		ns.info(SRC, "nil-global tracer ON: taints Blizzard code paths until /reload; do not fight with it on")
+		ns.print("tracer on. Play the addon you are porting out of combat, then /fp port, then /reload.")
+	elseif not on and tracing then
+		pcall(setmetatable, _G, nil)
+		tracing = false
+		ns.info(SRC, "nil-global tracer off (taint already spread; /reload to clear)")
+	end
+	settings().trace = on and true or false
+	return true
+end
+
+-- Everything known about each addon this session, printed to chat and stored.
+function probe.portReport()
+	local r = report()
+	local d = _G.ForeverProbeDB
+	local store = type(d) == "table" and d or ns
+	local addons = {}
+	local function bucket(name)
+		name = name or "unknown"
+		addons[name] = addons[name] or { errors = {}, actions = {}, nilGlobals = nil, loaded = nil }
+		return addons[name]
+	end
+	for _, a in ipairs((r.build and r.build.addons) or {}) do
+		local b = bucket(a.name)
+		b.loaded = a.loaded
+		b.reason = a.reason
+	end
+	for _, key in ipairs(store.errorOrder or {}) do
+		local e = store.errors[key]
+		if e then
+			local b = bucket(e.addon)
+			b.errors[#b.errors + 1] = e
+		end
+	end
+	for who, acts in pairs(r.actions or {}) do
+		bucket(who).actions = acts
+	end
+	for who, ng in pairs(r.nilGlobals or {}) do
+		bucket(who).nilGlobals = ng
+	end
+	r.port = { at = serverTime(), addons = addons }
+
+	local names = {}
+	for n in pairs(addons) do
+		names[#names + 1] = n
+	end
+	table.sort(names)
+	ns.print("porting report (%s addons seen)", #names)
+	for _, n in ipairs(names) do
+		local b = addons[n]
+		local kinds = {}
+		for _, e in ipairs(b.errors) do
+			kinds[e.kind] = (kinds[e.kind] or 0) + e.count
+		end
+		local parts = {}
+		for k, c in pairs(kinds) do
+			parts[#parts + 1] = k .. "=" .. c
+		end
+		local nActs = 0
+		for _, c in pairs(b.actions) do
+			nActs = nActs + c
+		end
+		local loaded = b.loaded == nil and "?" or (b.loaded and "loaded" or ("not loaded: " .. ns.str(b.reason)))
+		print(("  %-24s %s | errors %s%s | forbidden %s | nil globals %s"):format(n, loaded, #b.errors,
+			#parts > 0 and (" (" .. table.concat(parts, ", ") .. ")") or "", nActs, b.nilGlobals and b.nilGlobals.count or 0))
+		for _, e in ipairs(b.errors) do
+			if e.kind == "missing-api" or e.kind == "unknown-event" then
+				print(("      %s: %s x%s"):format(e.kind, ns.str(e.detail), e.count))
+			end
+		end
+	end
+	ns.print("full detail: log out, then scripts/read-probe.py --port")
+	return addons
+end
 
 ------------------------------------------------------------------------
 -- slash commands
@@ -713,6 +884,8 @@ local function menu()
 	print("  /fp build | api | events | secrets   re-run a collector now")
 	print("  /fp events full       also try the events suspected of being forbidden")
 	print("  /fp errors [list|clear|on|off]")
+	print("  /fp port              per-addon porting report: load state, errors by kind, forbidden actions")
+	print("  /fp trace on|off      nil-global tracer for a porting session (taints the UI; /reload after)")
 	print("  /fp watch EVENT | unwatch EVENT|all")
 	print("  /fp log [n]           last n log lines (default 20)")
 	print("  /fp verbose 0..3      chat verbosity (log keeps everything)")
@@ -749,6 +922,17 @@ local function handle(msg)
 		ns.print("%s present", #present)
 	elseif cmd == "events" then
 		probe.testEvents(string.lower(rest or "") == "full")
+	elseif cmd == "port" then
+		probe.portReport()
+	elseif cmd == "trace" then
+		local sub = string.lower(rest or "")
+		if sub == "on" then
+			probe.setTrace(true)
+		elseif sub == "off" then
+			probe.setTrace(false)
+		else
+			ns.print("tracer is %s; /fp trace on|off", tracing and "on" or "off")
+		end
 	elseif cmd == "secrets" then
 		probe.snapshotSecrets("manual")
 	elseif cmd == "errors" then

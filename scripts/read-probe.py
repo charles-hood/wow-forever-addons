@@ -7,6 +7,8 @@ Usage:
   scripts/read-probe.py --src HP        only one source (FP, SV, HP, EV, LUA)
   scripts/read-probe.py --grep range    only lines containing a string
   scripts/read-probe.py --all           everything, no summary trimming
+  scripts/read-probe.py --port          per-addon porting report (errors by kind,
+                                        forbidden actions, nil-global reads, load state)
   scripts/read-probe.py --json          dump the whole DB as JSON
   scripts/read-probe.py --file PATH     a specific SavedVariables file
 
@@ -284,6 +286,57 @@ def summary(db, char_dbs, args):
                 print(f"        {line}")
 
 
+def port_report(db):
+    """Per-addon porting report, built from the errors, actions and tracer data in the DB."""
+    rep = db.get("report") or {}
+    addons = {}
+
+    def bucket(name):
+        name = name or "unknown"
+        return addons.setdefault(name, {"errors": [], "actions": {}, "nil": None, "loaded": None, "reason": None})
+
+    for a in (rep.get("build") or {}).get("addons") or []:
+        b = bucket(a.get("name"))
+        b["loaded"] = a.get("loaded")
+        b["reason"] = a.get("reason")
+    errs = db.get("errors") or {}
+    for key in db.get("errorOrder") or []:
+        e = errs.get(key)
+        if e:
+            bucket(e.get("addon")).get("errors").append(e)
+    for who, acts in (rep.get("actions") or {}).items():
+        bucket(who)["actions"] = acts
+    for who, ng in (rep.get("nilGlobals") or {}).items():
+        bucket(who)["nil"] = ng
+
+    section(f"porting report ({len(addons)} addons seen)")
+    for name in sorted(addons):
+        b = addons[name]
+        if name.startswith("Blizzard_"):
+            continue
+        state = "?" if b["loaded"] is None else ("loaded" if b["loaded"] else f"not loaded ({b['reason']})")
+        kinds = {}
+        for e in b["errors"]:
+            kinds[e.get("kind", "other")] = kinds.get(e.get("kind", "other"), 0) + int(e.get("count") or 1)
+        acts = sum(int(v) for v in b["actions"].values())
+        nil_count = (b["nil"] or {}).get("count", 0)
+        print(f"\n  {name}: {state}; {len(b['errors'])} distinct errors"
+              + (f" ({', '.join(f'{k} {v}' for k, v in sorted(kinds.items()))})" if kinds else "")
+              + f"; forbidden actions {acts}; nil-global reads {nil_count}")
+        for e in b["errors"]:
+            kind = e.get("kind", "other")
+            detail = f" [{e.get('detail')}]" if e.get("detail") else ""
+            print(f"      {kind}{detail} x{e.get('count')}: {str(e.get('msg'))[:160]}")
+        for what, n in sorted(b["actions"].items()):
+            print(f"      forbidden x{n}: {what}")
+        names = (b["nil"] or {}).get("names") or {}
+        if names:
+            top = sorted(names.items(), key=lambda kv: -int(kv[1].get("n", 0)))[:25]
+            print("      nil globals read: " + ", ".join(f"{k} x{v.get('n')}" for k, v in top))
+            for k, v in top[:5]:
+                print(f"        {k}: first at {v.get('at')}")
+
+
 def show_log(db, args):
     log = db.get("log") or []
     rows = log
@@ -307,6 +360,7 @@ def main():
     ap.add_argument("--grep")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--port", action="store_true")
     args = ap.parse_args()
 
     files = [args.file] if args.file else sorted(glob.glob(DEFAULT_GLOB))
@@ -333,6 +387,9 @@ def main():
         return
     print(f"file: {path}")
     print(f"written: {ts(os.path.getmtime(path))}   size {os.path.getsize(path)} bytes")
+    if args.port:
+        port_report(db)
+        return
     summary(db, char_dbs, args)
     show_log(db, args)
 

@@ -3,7 +3,8 @@
 Lua addons for the World of Warcraft: Forever beta (interface 16001, the Retail
 12.x engine with secret values), plus probe addons that measure what the live
 client actually allows: SavedVariables, secret values in and out of combat,
-range checks, pet happiness, forbidden actions. Developed on macOS against the
+range checks, pet happiness, forbidden actions, and a per-addon porting report
+for any third-party addon you drop in. Developed on macOS against the
 client at `/Applications/World of Warcraft/_classic_beta_`, with an offline
 test harness so addons can be checked without launching the game.
 
@@ -105,11 +106,30 @@ Shout, off by default). The table is `ns.CHECKS` at the top of the file.
 everything for five seconds to place the frame),
 `lock|unlock`, `reset`, `scale`, `debug on|off`, `status`.
 
+## Porting report
+
+Drop any third-party addon into the AddOns folder next to ForeverProbe, play for
+a while, and ForeverProbe sorts everything that went wrong by addon: load state,
+Lua errors classified as missing API call, unknown event, secret-value access,
+nil index or other, with the function or event named, plus any action the
+client blocked. `/fp port` prints the summary in chat; after logout,
+`python3 -I scripts/read-probe.py --port` prints the full report with messages
+and counts. This is the runtime complement to a static scan: it reports what the
+addon actually hit.
+
+`/fp trace on` adds a nil-global tracer: every read of a global that does not
+exist is counted per addon with the file and line that read it, which shows the
+removed functions an addon probes for even when it guards them. The tracer puts
+a metamethod on the global table, which taints Blizzard's own code paths and
+can block protected UI in combat until the next `/reload`. Use it out of combat,
+in a porting session, and `/reload` afterwards. It never persists across sessions.
+
 ## In-game commands
 
-`/fp` (ForeverProbe): `status`, `sv`, `build`, `api`, `events`, `secrets`,
-`errors [list|clear|on|off]`, `watch EVENT`, `unwatch EVENT|all`, `log [n]`,
-`verbose 0..3`, `scripterrors on|off`, `json`, `clear`, `reset`.
+`/fp` (ForeverProbe): `status`, `sv`, `build`, `api`, `events [full]`, `secrets`,
+`errors [list|clear|on|off]`, `port`, `trace on|off`, `watch EVENT`,
+`unwatch EVENT|all`, `log [n]`, `verbose 0..3`, `scripterrors on|off`, `json`,
+`clear`, `reset`.
 
 `/hp` (HunterProbe): `range`, `range on|off`, `ammo`, `auras`, `swing on|off`, `status`.
 
