@@ -37,6 +37,9 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
   session 4 logged ADDON_ACTION_FORBIDDEN once "during RegisterEvent
   COMBAT_LOG_EVENT_UNFILTERED" and once "during UnregisterEvent
   COMBAT_LOG_EVENT_UNFILTERED", nothing else. Never register that event.
+- **BuffReminder verified in game (2026-10-10, build 70338).** Dropping the Aspect
+  made the icon appear; recasting it made it go away. Hunter's Mark target read
+  and the other classes' checks are still offline-only.
 - **HunterHUD validated in game (sessions 4 and 5).** With `/hh debug on`, every
   light change (RANGED, DEAD, OUT, NONE on the kill) matched HunterProbe's
   sampler within 0.1 s across three fights, zero Lua errors. Addon icons use
