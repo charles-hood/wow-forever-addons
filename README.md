@@ -11,7 +11,8 @@ ammo and auras. Everything they measure is written into SavedVariables so it can
 be read from disk after a session with `scripts/read-probe.py`.
 
 The first real addon built on those answers is **HunterHUD**: a dead-zone and
-range light plus an ammo counter.
+range light plus an ammo counter. Client facts measured so far are collected in
+`CLAUDE.md` under "Measured on this Mac".
 
 ## Layout
 
@@ -39,8 +40,8 @@ scripts/deploy.sh             # symlink addons into the client
 scripts/seed-probe.sh         # with the game closed: seed the SavedVariables files
 ```
 
-Then launch the beta, enable **ForeverProbe** and **HunterProbe** on the
-character-select AddOns screen, and log in. ForeverProbe prints the
+Then launch the beta, enable **ForeverProbe**, **HunterProbe** and
+**HunterHUD** on the character-select AddOns screen, and log in. ForeverProbe prints the
 SavedVariables verdict in chat on login. Play a little (target something, fight
 something, open bags), then log out fully. Read what happened:
 
@@ -58,6 +59,9 @@ target. A small white dot beside it means Wing Clip is in range. On the right th
 ammo count: plain, yellow at or under the warn threshold, red and flashing once
 at or under the critical threshold, NO AMMO when empty, and two dashes when the
 ranged weapon needs none.
+
+Verified in game on build 70338: with `/hh debug on`, every light change
+matched HunterProbe's independent sampler across three fights, with no errors.
 
 How it decides: Auto Shot's range check answers true only between the dead zone
 and 35 yards. When it answers false, a 35-yard item range check (Zorbin's
