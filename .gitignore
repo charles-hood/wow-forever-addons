@@ -3,3 +3,4 @@ types/
 *.bak
 *.bak-*
 tests/out/
+.playwright-mcp/
