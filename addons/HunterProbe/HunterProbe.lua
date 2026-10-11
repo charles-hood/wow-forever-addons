@@ -311,7 +311,7 @@ local function reportAmmo()
 	local stacks, total, quivers = {}, 0, {}
 	for bag = 0, numBags do
 		local okN, slots = call("C_Container.GetContainerNumSlots", bag)
-		if okN and type(slots) == "number" and slots > 0 then
+		if okN and type(slots) == "number" and not FP.issecret(slots) and slots > 0 then
 			if bag > 0 then
 				local okInv, invSlot = call("C_Container.ContainerIDToInventoryID", bag)
 				if okInv and type(invSlot) == "number" then
@@ -496,22 +496,22 @@ local function petFood()
 	local edible, checked = {}, 0
 	for bag = 0, numBags do
 		local okN, slots = call("C_Container.GetContainerNumSlots", bag)
-		if okN and type(slots) == "number" then
+		if okN and type(slots) == "number" and not FP.issecret(slots) then
 			for slot = 1, slots do
 				local okS, cinfo = call("C_Container.GetContainerItemInfo", bag, slot)
 				if okS and type(cinfo) == "table" then
 					local okR, itemID, link = pcall(function() return cinfo.itemID, cinfo.hyperlink end)
-					if okR and type(itemID) == "number" then
+					if okR and type(itemID) == "number" and not FP.issecret(itemID) then
 						checked = checked + 1
 						local okC, can = call("C_PetInfo.CanPetEatItem", itemID)
 						if okC == nil then
 							return nil, "C_PetInfo.CanPetEatItem missing"
 						elseif not okC then
-							edible[#edible + 1] = itemID .. ":ERR " .. str(can)
+							edible[#edible + 1] = str(itemID) .. ":ERR " .. str(can)
 						elseif can == true then
 							edible[#edible + 1] = str(link or itemID)
 						elseif FP.issecret(can) then
-							edible[#edible + 1] = itemID .. ":<secret>"
+							edible[#edible + 1] = str(itemID) .. ":<secret>"
 						end
 					end
 				end
