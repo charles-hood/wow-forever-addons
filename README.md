@@ -143,6 +143,14 @@ client restart. `tests/run.sh` before deploying catches syntax errors, unknown
 globals against the real client API, and logic regressions without launching
 the game.
 
+## Notes on other people's work
+
+`docs/pocketcfo-framework-catalog.md` catalogs the framework techniques in
+PocketCFO, a six-module crafting-business suite with a Forever build, with a
+vetting note per technique. `docs/forever-addon-kit-issue.md` and
+`docs/atraeau-pr.md` are the texts of the issue and pull request sent to the
+two reference repos.
+
 ## License
 
 MIT. See LICENSE.
