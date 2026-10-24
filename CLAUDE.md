@@ -100,6 +100,64 @@ the account folder on their own when there is exactly one; set `WOW_ACCOUNT` oth
 - Session 1 verdict was NOT LOADED only because no file existed yet; the seed was
   written after that logout. Session 2 settled it (see above).
 
+## Learned from PocketCFO (Brian, MerchantCGaming), 2026-10-24
+
+Client facts he measured on the Forever beta that we have not re-measured:
+
+- The loot-money chat message (`CHAT_MSG_MONEY`) arrives about 1 s after
+  `PLAYER_MONEY` on Forever (captured 2026-10-20); Retail is under 0.5 s. Anything
+  that pairs those two events needs a 2 s hold on Forever.
+- `ACCOUNT_BANK_*` events are invalid on the beta and none fire at the banker:
+  no Warband bank. No crafting orders either, so `C_CraftingOrders` paths are dead
+  code here.
+- `Enum.PlayerInteractionType.MailInfo` is 17 (confirmed in game 2026-10-19 by him).
+- Forever reported `WOW_PROJECT_ID` 1 on an earlier build and 18 now; he detects
+  the flavour by which TOC loaded, never by project ID. Same conclusion as ours.
+- Money, mailbox and auction values reached his gold ledger on the beta, which is
+  evidence they are not secret; we have not probed it ourselves.
+
+Conventions adopted from his framework. Apply them in every addon here:
+
+- **Write the verification state next to the code.** A comment that asserts
+  client behaviour says either `Theoretical` (assumed from docs or Blizzard
+  source, not yet seen) or `confirmed in game <date>` (seen, with the date and
+  build). Update it when the probe or a session settles it. Our "Measured on
+  this Mac" section stays the index; the comment at the call site is the detail.
+- **Compat shims at the top of the file, never at call sites**:
+  `local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo`. Do not
+  define removed globals back into `_G` (that is what the kit's ForeverCompat
+  does, and it taints).
+- **Look services up lazily and defensively.** A local getter at use time that
+  returns nil, and a caller that reports "unresolved" with a reason string,
+  never an error. Never force another addon to load as a side effect of a query.
+- **Only scalars into SavedVariables.** Copy rows field by field keeping strings,
+  numbers and booleans; never store a frame, a function or a secret value.
+- **Separate observation from adjustment.** Scanners write baselines; actions in
+  between write deltas with an ID and a reason; readers combine the two. A late
+  or wrong scan then cannot corrupt what the addon did in between.
+- **Capture at event time, dispatch side effects separately.** One listener per
+  event does only the reads that must happen then; everything else goes through
+  a dispatcher that can be tested without the event.
+- **Attribute unordered events by claims, never by guesses.** Hold a change
+  briefly, let exact-amount claims win, then direction-only claims with a TTL,
+  then window rules, and log the rest as Unknown with context so each gap can
+  become a rule. (His gold ledger; the shape fits any "what caused this" problem.)
+- **Long work in chunks with a yield**, with a timeout and a cooldown, and a
+  `pcall` wrapper that returns `ok, {returns}` so a failed call is never indexed.
+- **Diagnostics as a module**: a command registry with metadata (`playerFacing`,
+  `destructive`, `temporary`) driving the slash commands and generated help; an
+  in-memory session log; a copyable dump window (multi-line edit box, select all
+  on show, Escape closes via `UISpecialFrames`). ForeverProbe writes to disk
+  instead; adding the dump window to it is the gap.
+- **Policies by naming convention** when behaviour varies by a type: a module
+  named for the type supplies the variant, the evaluator stays single.
+- `hooksecurefunc` only, never replace a Blizzard function. Build a window's
+  numbers in full before drawing. Short chat prefix, product name out of chat.
+- If an addon here ever gets a Retail twin: one source tree, two TOCs, and a
+  one-line flavour file loaded only by the Forever TOC.
+
+Full catalog with file pointers: `docs/pocketcfo-framework-catalog.md`.
+
 ## Workflow
 
 - `tests/run.sh` before every deploy: luac, luacheck against the real client
